@@ -59,7 +59,7 @@ class Task implements Runnable {
                     ps = new PrintStream(succ_sock.getOutputStream());
 
                     ps.println(key);
-                    succ_sock.close();
+                    succ_sock.close();   
                 }
 
                 sock.close();
@@ -112,6 +112,7 @@ public class bootstrap {
 
                         //send packet to localhost to start the key space search
                         ps.println(key); 
+                        
                         //maybe add ACK here to gaurantee the print statements don't overlap each other
                         //if so, then change the port number for sock in this context
                         break;
