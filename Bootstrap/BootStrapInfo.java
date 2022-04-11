@@ -50,6 +50,15 @@ public class BootStrapInfo {
         return succ.port;
     }
 
+    //get id's
+    public int getPredID() {
+        return pred.id;
+    }
+
+    public int getSuccID() {
+        return succ.id;
+    }
+
     //reset the succ and pred
     public void setSucc(int id, String IP, int port) {
         succ.id = id;
