@@ -64,27 +64,73 @@ class Task implements Runnable {
                 }
                 else {
                     //parse packet for specific command
+                    //parse the command
                     int i = 0;
                     for(; i < msg.length() && msg.charAt(i) != ':'; i++) {}
                     String command = msg.substring(0, i);
 
-                    int key = Integer.parseInt(msg.substring(i + 1, msg.length()));
+                    //parse the key
+                    String keyS = ""; i++;
+                    while(i < msg.length() && msg.charAt(i) != ' ') {keyS += msg.charAt(i); i++;}
+
+                    //parse the value
+                    String valueS = ""; i++;
+                    while(i < msg.length() && msg.charAt(i) != ' ') {valueS += msg.charAt(i); i++;}
+
+                    int key = Integer.parseInt(keyS);
+                    int value = -1;
+
+                    if(valueS.length() > 0)
+                        value = Integer.parseInt(valueS);
+
+                    //for name server - will be modified to:
+                    //key >= Globals.bsi.getStartingRange() && key <= Globals.bsi.getEndingRange()
+                    //1024 is required here b/c of the values circling back to 0
+                    boolean inRange = key >= Globals.bsi.getStartingRange() && key <= 1024;
 
                     switch(command) {
                         case "lookup":
                             //if in key space 
-                            if(key >= Globals.bsi.getStartingRange() && key <= Globals.bsi.getEndingRange()) {
-                                sendACK("0/" + key);//path to key 
+                            if(inRange && Globals.keySpace[key] != -1) {
+                                sendACK(Integer.toString(Globals.keySpace[key]) + ":0/");//value:path/to/key
                             }
                             else {
                                 sendToSucc(key);
                             }
 
                             break;
+
+                        case "delete":
+                            if(inRange && Globals.keySpace[key] != -1) {
+                                Globals.keySpace[key] = -1;
+                                sendACK("Successful deletion\n" + "0/");
+                            }
+                            else {
+                                sendToSucc(key);
+                            }
+
+                            break;
+
+                        case "insert":
+                            if(inRange && Globals.keySpace[key] == -1) {
+                                Globals.keySpace[key] = value;
+                                sendACK("0/");//path to key 
+                            }
+                            else {
+                                sendToSucc(key);
+                            }     
                     }
                 }
 
                 sock.close();
+            }
+            catch(NumberFormatException nfe) {
+                System.err.println("Number format exception in thread pool.");
+                System.err.println(nfe);
+            }
+            catch(StringIndexOutOfBoundsException sio) {
+                System.err.println("String out of bound error in thread pool.");
+                System.err.println(sio);
             }
             catch(IOException ioe) {
                 System.err.println("Error with the socket.");
@@ -153,9 +199,13 @@ public class bootstrap {
                 for(; i < input.length() && input.charAt(i) != ' '; i++) {}
                 String command = input.substring(0, i);
 
-                String key = "";
-                if(i < input.length())
-                    key = input.substring(i + 1, input.length());
+                //parse the key
+                String key = ""; i++;
+                while(i < input.length() && input.charAt(i) != ' ') {key += input.charAt(i); i++;}
+
+                //parse the value
+                String value = ""; i++;
+                while(i < input.length() && input.charAt(i) != ' ') {value += input.charAt(i); i++;}
 
                 boolean flag = false;//only want to recieve ACK if command was valid
 
@@ -166,7 +216,7 @@ public class bootstrap {
                         break;
 
                     case "insert":
-                        ps.println("insert:" + key); 
+                        ps.println("insert:" + key + ' ' + value); 
                         break;
 
                     case "delete":
@@ -190,6 +240,10 @@ public class bootstrap {
 
                 sock.close();
             }
+        }
+        catch(StringIndexOutOfBoundsException sio) {
+            System.err.println("String out of bound error in user-interaction.");
+            System.err.println(sio);
         }
         catch(BindException be) {
             System.err.println("ServerSocket already binded.");
