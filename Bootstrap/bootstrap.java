@@ -10,18 +10,19 @@ import java.util.Scanner;
 class Globals {
     // automatically sets pred and succ to itself
     public static BootStrapInfo bsi = new BootStrapInfo();
-    public final static int port = 2002;//for thread pool
+    public static int port;//for thread pool
     public final static int port2 = 2003;//for user-interaction thread
+    public static int id;
 
-    public static int keySpace[] = new int[1024];//hash value is already given, so make an array instead and the id will be the position
+    public static String keySpace[] = new String[1024];//hash value is already given, so make an array instead and the id will be the position
     //doesn't need to be resized when new nodes are added since the range will be checked first.
     //when a node is removed or added, you can simply update the values back to -1 that are not within the range, if necessary
 
     public Globals() {
         //set key space
-        keySpace[0] = 0;//position 0 is itself with an id of 0
-        for(int i = 1; i < 1024; i++) {
-            keySpace[i] = -1;
+        //keySpace[0] = 0;//position 0 is itself with an id of 0
+        for(int i = 0; i < 1024; i++) {
+            keySpace[i] = null;
         }
     }
 }
@@ -38,6 +39,7 @@ class Task implements Runnable {
     }
 
     @Override
+    // this should handle nodes trying to enter and exit the system
     public void run() { // method to execute within thread
         while(true) {
             try {
@@ -53,76 +55,7 @@ class Task implements Runnable {
                 ----------------------------------------------
                 */
 
-                //if key is not found in the last nameserver, then it will send a packet to the
-                //bootstrap with the 'NF' message for 'Not Found.'
-                if(msg.equals("NF")) {
-                    sendACK("Key not found.");
-                }
-                else if(msg.substring(0, 2).equals("F:")) {// when node contacts bootstrap of found key
-                    //packet format when key found: "F:sequence/of/nodes/to/key"
-                    sendACK(msg.substring(2, msg.length()));
-                }
-                else {
-                    //parse packet for specific command
-                    //parse the command
-                    int i = 0;
-                    for(; i < msg.length() && msg.charAt(i) != ':'; i++) {}
-                    String command = msg.substring(0, i);
-
-                    //parse the key
-                    String keyS = ""; i++;
-                    while(i < msg.length() && msg.charAt(i) != ' ') {keyS += msg.charAt(i); i++;}
-
-                    //parse the value
-                    String valueS = ""; i++;
-                    while(i < msg.length() && msg.charAt(i) != ' ') {valueS += msg.charAt(i); i++;}
-
-                    int key = Integer.parseInt(keyS);
-                    int value = -1;
-
-                    if(valueS.length() > 0)
-                        value = Integer.parseInt(valueS);
-
-                    //for name server - will be modified to:
-                    //key >= Globals.bsi.getStartingRange() && key <= Globals.bsi.getEndingRange()
-                    //1024 is required here b/c of the values circling back to 0
-                    boolean inRange = key >= Globals.bsi.getStartingRange() && key <= 1024;
-
-                    switch(command) {
-                        case "lookup":
-                            //if in key space 
-                            if(inRange && Globals.keySpace[key] != -1) {
-                                sendACK(Integer.toString(Globals.keySpace[key]) + ":0/");//value:path/to/key
-                            }
-                            else {
-                                sendToSucc(key);
-                            }
-
-                            break;
-
-                        case "delete":
-                            if(inRange && Globals.keySpace[key] != -1) {
-                                Globals.keySpace[key] = -1;
-                                sendACK("Successful deletion\n" + "0/");
-                            }
-                            else {
-                                sendToSucc(key);
-                            }
-
-                            break;
-
-                        case "insert":
-                            if(inRange && Globals.keySpace[key] == -1) {
-                                Globals.keySpace[key] = value;
-                                sendACK("0/");//path to key 
-                            }
-                            else {
-                                sendToSucc(key);
-                            }     
-                    }
-                }
-
-                sock.close();
+                
             }
             catch(NumberFormatException nfe) {
                 System.err.println("Number format exception in thread pool.");
@@ -141,29 +74,6 @@ class Task implements Runnable {
             }
         }
     }
-
-    private void sendToSucc(int key) throws IOException {
-        if(Globals.bsi.getSuccID() == 0) { //if bootstrap is the only node in the system
-            sendACK("Key not found.");
-        }
-        else { // if key not found and there's another node in the system, send to successor
-            Socket succ_sock = new Socket(Globals.bsi.getSuccIP(), Globals.bsi.getSuccPort());
-            ps = new PrintStream(succ_sock.getOutputStream());
-
-            //will send two packets. nameservers need to expect two so keeping track of node path and key is easier
-            ps.println("0/");
-            ps.println(key);
-            succ_sock.close();
-        }
-    }
-
-    private void sendACK(String message) throws IOException {
-        Socket ack_sock = new Socket("localhost", Globals.port2);
-        ps = new PrintStream(ack_sock.getOutputStream());
-
-        ps.println(message);
-        ack_sock.close();
-    }
 }
 
 //main class
@@ -172,9 +82,29 @@ public class bootstrap {
         final int threadCount = 10;
         Globals gb = new Globals();//initialize keyspace array
 
+        // initialize from input file
+        try {
+            File inputFile = new File(args[0]);
+            Scanner inputScan = new Scanner(inputFile);
+            Globals.id = inputScan.nextInt();
+            Globals.port = inputScan.nextInt();
+  
+            int index;
+            String data;
+            while(inputScan.hasNext()) {
+                index = inputScan.nextInt();
+                data = inputScan.next();
+                Globals.keySpace[index] = data;
+            }
+            inputScan.close();
+        } catch (FileNotFoundException fe) {
+            System.out.println("Input file " + args[0] + " not found.");
+            System.exit(0);
+        }
+
         try {
             ServerSocket ss = new ServerSocket(Globals.port);
-            ServerSocket ack_ss = new ServerSocket(Globals.port2);//wait for ACK
+            //ServerSocket ack_ss = new ServerSocket(Globals.port2);//wait for ACK
             ExecutorService pool = Executors.newFixedThreadPool(threadCount);//thread pool class
 
             //execute 10 threads in thread pool
@@ -183,14 +113,8 @@ public class bootstrap {
 
             //user interation thread
             Scanner sc = new Scanner(System.in);
-            Socket ack_sock;
 
             while(true) {
-                //sock from thread pool
-                //have to establish each time because of accept()
-                Socket sock = new Socket("localhost", Globals.port);
-                PrintStream ps = new PrintStream(sock.getOutputStream());
-
                 System.out.print("Enter a command> ");
                 String input = sc.nextLine();
 
@@ -200,45 +124,84 @@ public class bootstrap {
                 String command = input.substring(0, i);
 
                 //parse the key
-                String key = ""; i++;
-                while(i < input.length() && input.charAt(i) != ' ') {key += input.charAt(i); i++;}
+                String keyS = ""; i++;
+                while(i < input.length() && input.charAt(i) != ' ') {keyS += input.charAt(i); i++;}
 
                 //parse the value
                 String value = ""; i++;
                 while(i < input.length() && input.charAt(i) != ' ') {value += input.charAt(i); i++;}
 
-                boolean flag = false;//only want to recieve ACK if command was valid
-
+                // find if the key is inRange
+                boolean inRange = true;;
+                int key = 0;
+                if( keyS.length() > 0) {
+                    key = Integer.parseInt(keyS);
+                    if(key > 1023 | key < 0) {
+                        System.out.println("Key out of range [0-1023].");
+                        continue;
+                    }
+                    if(Globals.bsi.isOnlyServer()) {
+                        inRange = true;
+                    } else {
+                        inRange = key >= Globals.bsi.getStartingRange() && key <= 1023;
+                        if(key == 0) {
+                            inRange = true;
+                        }
+                    }
+                }
                 switch(command) {
                     case "lookup":
-                        //send packet to localhost to start the key space search
-                        ps.println("lookup:" + key); 
+                        // if in keyspace print, if not send to succesor
+                        if(inRange) {
+                            if(Globals.keySpace[key] == null) {
+                                System.out.println("No value exists.");
+                            } else{
+                                System.out.println("Key[" + key + "] " + Globals.keySpace[key]);
+                            }
+                        } else {
+                            // send to succesor, and wait for result from a node
+                            // send input to succesor
+                        }
                         break;
 
                     case "insert":
-                        ps.println("insert:" + key + ' ' + value); 
+                        // if in keyspace, enter into table, if not send to succesor
+                        if(inRange) { // if need to handle collisions, push to back of list
+                            Globals.keySpace[key] = value;
+                        } else {
+                            // send to succesor, and wait for result from a node
+                        }
                         break;
 
                     case "delete":
-                        ps.println("delete:" + key); 
+                        // if in keyspace, enter into table, if not, send to succesor
+                        if(inRange) {
+                            if(Globals.keySpace[key] == null) {
+                                System.out.println("No value exists to delete.");
+                            } else{
+                                Globals.keySpace[key] = null;
+                            }
+                        } else {
+                            // send to succesor
+                        }
+                        break;
+
+                    case "print":
+                        System.out.println("ID 0:");
+                        if(Globals.bsi.isOnlyServer()) {
+                            for(int j = 0; j <= 1023; j++) {
+                                if(Globals.keySpace[j] != null) {
+                                    System.out.println("\t[" + j + "] " + Globals.keySpace[j]);
+                                }
+                            }
+                        } else {
+                            // send to succesor to collect the string list
+                        }
                         break;
 
                     default:
                         System.err.println("Command not recognized.");
-                        flag = true;
                 }
-
-                if(!flag) {
-                    //ACK from the thread pool so prints don't overlap
-                    //block until response is received
-                    ack_sock = ack_ss.accept();
-                    BufferedReader br = new BufferedReader(new InputStreamReader(ack_sock.getInputStream()));
-
-                    System.out.println(br.readLine());
-                    ack_sock.close();
-                }
-
-                sock.close();
             }
         }
         catch(StringIndexOutOfBoundsException sio) {
@@ -255,4 +218,20 @@ public class bootstrap {
             System.err.println(ex);
         }
     }
+
+    private static void sendToSucc(int key) throws IOException {
+        if(Globals.bsi.getSuccID() == 0) { //if bootstrap is the only node in the system
+            System.out.println("Key not found.");
+        }
+        else { // if key not found and there's another node in the system, send to successor
+            Socket succ_sock = new Socket(Globals.bsi.getSuccIP(), Globals.bsi.getSuccPort());
+            PrintStream ps = new PrintStream(succ_sock.getOutputStream());
+
+            //will send two packets. nameservers need to expect two so keeping track of node path and key is easier
+            ps.println("0/");
+            ps.println(key);
+            succ_sock.close();
+        }
+    }
 }
+

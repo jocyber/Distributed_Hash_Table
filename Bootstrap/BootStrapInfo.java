@@ -20,8 +20,16 @@ public class BootStrapInfo {
     }
 
     //pred and succ start out as itself
-    private NameServer pred = new NameServer(0, "127.0.0.1", Globals.port);
-    private NameServer succ = new NameServer(0, "127.0.0.1", Globals.port);
+    //private NameServer pred = new NameServer(0, "127.0.0.1", Globals.port);
+    //private NameServer succ = new NameServer(0, "127.0.0.1", Globals.port);
+    private NameServer pred = null;
+    private NameServer succ = null;
+    private boolean onlyServer = true;
+
+    // see if the bootstrap is the only server
+    public boolean isOnlyServer() {
+        return onlyServer;
+    }
 
     //get key space ranges
     public int getStartingRange() {
@@ -72,3 +80,5 @@ public class BootStrapInfo {
         pred.port = port;
     }
 }
+
+

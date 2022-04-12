@@ -1,1 +1,1 @@
-java Bootstrap.bootstrap
+java Bootstrap.bootstrap Bootstrap/bnConfigfile.txt
