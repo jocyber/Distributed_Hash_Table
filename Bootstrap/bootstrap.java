@@ -6,10 +6,12 @@ import java.io.*;
 import java.net.*;
 import java.util.Scanner;
 
+import Info.ServerInfo;
+
 //class of global variables
 class Globals {
     // automatically sets pred and succ to itself
-    public static BootStrapInfo bsi = new BootStrapInfo();
+    public static ServerInfo bsi = new ServerInfo();
     public static int port;//for thread pool
     public final static int port2 = 2003;//for user-interaction thread
     public static int id;
@@ -18,7 +20,7 @@ class Globals {
     //doesn't need to be resized when new nodes are added since the range will be checked first.
     //when a node is removed or added, you can simply update the values back to -1 that are not within the range, if necessary
 
-    public Globals() {
+    public static void setKeySpace() {
         //set key space
         //keySpace[0] = 0;//position 0 is itself with an id of 0
         for(int i = 0; i < 1024; i++) {
@@ -28,7 +30,6 @@ class Globals {
 }
 
 class Task implements Runnable {
-
     private ServerSocket ss;
     private Socket sock;
     private BufferedReader br;
@@ -39,7 +40,6 @@ class Task implements Runnable {
     }
 
     @Override
-    // this should handle nodes trying to enter and exit the system
     public void run() { // method to execute within thread
         while(true) {
             try {
@@ -53,9 +53,17 @@ class Task implements Runnable {
                 ----------------------------------------------
                 also need to handle enter/exit of a nameserver
                 ----------------------------------------------
-                */
+                */ 
 
-                
+                if(msg.substring(0, 5).equals("enter")) {
+                    int id = Integer.parseInt(msg.substring(6, msg.length()));
+                }
+
+                //set isOnly server to false
+            }
+            catch(NumberFormatException nfe) {
+                System.err.println("Couldn't parse id in thread pool.");
+                System.err.println(nfe);
             }
             catch(StringIndexOutOfBoundsException sio) {
                 System.err.println("String out of bound error in thread pool.");
@@ -76,7 +84,7 @@ class Task implements Runnable {
 public class bootstrap {
     public static void main(String[] args) {
         final int threadCount = 10;
-        Globals gb = new Globals();//initialize keyspace array
+        Globals.setKeySpace();//initialize keyspace array
 
         // initialize from input file
         try {
@@ -203,16 +211,15 @@ public class bootstrap {
                     case "print":
                         System.out.println("ID 0:");
 
-                        if(Globals.bsi.isOnlyServer()) {
-                            for(int j = 0; j <= 1023; j++) {
-                                if(Globals.keySpace[j] != null) {
-                                    System.out.println("\t[" + j + "] " + Globals.keySpace[j]);
-                                }
+                        for(int j = 0; j <= 1023; j++) {
+                            if(Globals.keySpace[j] != null) {
+                                System.out.println("\t[" + j + "] " + Globals.keySpace[j]);
                             }
-                        } 
-                        else {
-                            ;//send to successor to print the rest of the list
                         }
+
+                        if(!Globals.bsi.isOnlyServer()) {
+                            ;//send to successor to print the rest of the list
+                        } 
                         
                         break;
 
@@ -242,8 +249,7 @@ public class bootstrap {
         PrintStream ps = new PrintStream(succ_sock.getOutputStream());
 
         //will send two packets. nameservers need to expect two so keeping track of node path and key is easier
-        ps.println("0/");
-        ps.println(key);
+        ps.println(key + ":0/");
 
         //create a server socket here and wait for oncoming connections from the name servers
         ServerSocket ss = new ServerSocket(Globals.port2);

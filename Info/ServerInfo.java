@@ -1,8 +1,8 @@
-package Bootstrap;
+package Info;
 
 //information 'struct'
-public class BootStrapInfo {
-    final private int id = 0;
+public class ServerInfo {
+    private int id = 0;
 
     //mx = current node
     //key space range = [H(pred(mx)) + 1, H(mx)]
@@ -30,6 +30,9 @@ public class BootStrapInfo {
     public boolean isOnlyServer() {
         return onlyServer;
     }
+
+    public void notOnlyServer() { onlyServer = false; }
+    public void resetOnlyServer() { onlyServer = true;}
 
     //get key space ranges
     public int getStartingRange() {
@@ -66,6 +69,8 @@ public class BootStrapInfo {
     public int getSuccID() {
         return succ.id;
     }
+
+    public void setID(int id) {this.id = id;}
 
     //reset the succ and pred
     public void setSucc(int id, String IP, int port) {
