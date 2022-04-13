@@ -27,6 +27,39 @@ class Globals {
             keySpace[i] = null;
         }
     }
+
+    public static boolean sendToSucc(int key) throws IOException {
+        // if key not found and there's another node in the system, send to successor
+       Socket succ_sock = new Socket(bsi.getSuccIP(), bsi.getSuccPort());
+       PrintStream ps = new PrintStream(succ_sock.getOutputStream());
+
+       //will send two packets. nameservers need to expect two so keeping track of node path and key is easier
+       ps.println(key + ":0/");
+
+       //create a server socket here and wait for oncoming connections from the name servers
+       ServerSocket ss = new ServerSocket(Globals.port2);
+       Socket ack_sock;
+
+       boolean flag = false;
+
+       ack_sock = ss.accept();
+       BufferedReader br = new BufferedReader(new InputStreamReader(ack_sock.getInputStream()));
+       String ack = br.readLine();
+
+       if(ack.equals("NF")) {
+           System.out.println("Key not found.");
+       }
+       else if(ack.substring(0, 2).equals("F:")) {// if found, F:path/to/key
+           System.out.println(key + ':' + ack.substring(2, ack.length()));//key:path/to/key
+           flag = true;
+       }
+
+       ack_sock.close();
+       succ_sock.close();
+       ss.close();
+
+       return flag;
+   }
 }
 
 class Task implements Runnable {
@@ -50,26 +83,39 @@ class Task implements Runnable {
                 String msg = br.readLine();
 
                 /*
-                ----------------------------------------------
-                also need to handle enter/exit of a nameserver
-                ----------------------------------------------
+                ----------------------------------
+                handle enter/exit of a nameserver
+                ----------------------------------
                 */ 
 
-                if(msg.substring(0, 5).equals("enter")) {
+                if(msg.substring(0, 5).equals("enter")) {//enter:id
                     int id = Integer.parseInt(msg.substring(6, msg.length()));
-                    //send key information to the nameserver
+                    boolean isOnlyServer = Globals.bsi.isOnlyServer();
 
-                    if(id > 0 && id <= Globals.bsi.getEndingRange()) {
-                        
+                    if((isOnlyServer && id > 0 && id < 1024) || (id > 0 && id < Globals.bsi.getEndingRange())) {
+                        //send key information to the nameserver
+                        ps = new PrintStream(sock.getOutputStream());
+
+                        for(int i = Globals.bsi.getStartingRange(); i < id; i++) {
+                            ps.println(i + ":" + Globals.keySpace[i]);
+                            Globals.keySpace[i] = null;
+                        }
+
+                        ps.println("end");
+
+                        //update pred
+                        //update succ
                     }
-
-                    //reset keys in this space
-                    for(int i = 0; i < id; i++) {
-                        Globals.keySpace[i] = null;
+                    else {
+                        Globals.sendToSucc(id);
                     }
                 }
 
-                //set isOnly server to false
+                sock.close();
+            }
+            catch(NullPointerException npe) {
+                System.err.println("Null pointer in thread pool.");
+                System.err.println(npe);
             }
             catch(NumberFormatException nfe) {
                 System.err.println("Couldn't parse id in thread pool.");
@@ -183,7 +229,7 @@ public class bootstrap {
                             }
                         } 
                         else {
-                            sendToSucc(key);
+                            Globals.sendToSucc(key);
                         }
 
                         break;
@@ -195,7 +241,7 @@ public class bootstrap {
                             Globals.keySpace[key] = value;
                         } 
                         else {
-                            sendToSucc(key);
+                            Globals.sendToSucc(key);
                         }
                         
                         break;
@@ -212,7 +258,7 @@ public class bootstrap {
                             }
                         } 
                         else {
-                            if(sendToSucc(key))
+                            if(Globals.sendToSucc(key))
                                 System.out.println("Successful deletion.");
                         }
                         
@@ -251,38 +297,6 @@ public class bootstrap {
         catch(Exception ex) {
             System.err.println(ex);
         }
-    }
-
-    private static boolean sendToSucc(int key) throws IOException {
-         // if key not found and there's another node in the system, send to successor
-        Socket succ_sock = new Socket(Globals.bsi.getSuccIP(), Globals.bsi.getSuccPort());
-        PrintStream ps = new PrintStream(succ_sock.getOutputStream());
-
-        //will send two packets. nameservers need to expect two so keeping track of node path and key is easier
-        ps.println(key + ":0/");
-
-        //create a server socket here and wait for oncoming connections from the name servers
-        ServerSocket ss = new ServerSocket(Globals.port2);
-        Socket ack_sock;
-
-        boolean flag = false;
-
-        ack_sock = ss.accept();
-        BufferedReader br = new BufferedReader(new InputStreamReader(ack_sock.getInputStream()));
-        String ack = br.readLine();
-
-        if(ack.equals("NF")) {
-            System.out.println("Key not found.");
-        }
-        else if(ack.substring(0, 2).equals("F:")) {// if found, F:path/to/key
-            System.out.println(key + ':' + ack.substring(2, ack.length()));//key:path/to/key
-            flag = true;
-        }
-
-        ack_sock.close();
-        succ_sock.close();
-
-        return flag;
     }
 }
 

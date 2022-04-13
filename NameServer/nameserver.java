@@ -7,7 +7,8 @@ import java.util.Scanner;
 import Info.ServerInfo;
 
 class Globals {
-    public final static int port = 3000;
+    public final static int port = 3000;//for listening to lookups, etc
+    public final static int port2 = 3002; //for user-interaction
     public static ServerInfo nsi = new ServerInfo();
     public static int id;
 
@@ -34,7 +35,7 @@ class Task extends Thread {
     public void run() {
         while(true) {
             try {
-                //wait for lookup, insert, or delete request
+                //wait for lookup, insert, or delete request. as well as enter and exit
                 sock = ss.accept();
                 BufferedReader br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
                 br.readLine();
@@ -55,7 +56,7 @@ class Task extends Thread {
 public class nameserver {
     public static void main(String[] args) {
         Globals.setKeySpace();
-        Globals.id = 10;
+        Globals.id = 50;//temporary
         //Globals.id = id from file
 
         try {
@@ -65,7 +66,8 @@ public class nameserver {
 
             while(true) {
                 Scanner sc = new Scanner(System.in);
-                System.out.println("Enter a command, bitch> ");
+
+                System.out.print("Enter a command, bitch> ");
                 String input = sc.nextLine();
 
                 if(input.equals("enter")) {
@@ -73,7 +75,34 @@ public class nameserver {
                     PrintStream ps = new PrintStream(sock.getOutputStream());
 
                     ps.println("enter:" + Globals.id);//send enter message along with id
-                    //maybe wait for ack so the node knows it's in the system and then update the pred and succ
+                    BufferedReader br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+
+                    String resp;
+                    
+                    while(!((resp = br.readLine()).equals("end"))) {
+                        //parse packet and update keyspace array
+                        int i = 0;
+                        for(;resp.charAt(i) != ':'; i++) {;}
+
+                        int key = Integer.parseInt(resp.substring(0, i));
+                        String val = resp.substring(i + 1, resp.length());
+
+                        Globals.keySpace[key] = val;
+                    }
+
+                    //temporary for testing
+                    for(int i = 0; i < Globals.id; i++) {
+                        System.out.println("key: " + i + " value: " + Globals.keySpace[i]);
+                    }
+
+                    //update succ and pred
+                    //Globals.nsi.setPred(id, IP, port);
+                    //Globals.nsi.setSucc(id, IP, port);
+
+                    //print successful entry on completion
+                    //print the range of keys for this server
+                    //print the id of the pred and succ
+                    //print the id's of the servers that were traversed
 
                     sock.close();//must close for the connection to be accepted on next connection
                 }

@@ -1,3 +1,3 @@
 javac Bootstrap/*.java
-javac ServerInfo.java
+javac Info/ServerInfo.java
 javac NameServer/*.java
