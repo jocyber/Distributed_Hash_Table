@@ -92,7 +92,7 @@ class Task implements Runnable {
                     int id = Integer.parseInt(msg.substring(6, msg.length()));
                     boolean isOnlyServer = Globals.bsi.isOnlyServer();
 
-                    if((isOnlyServer && id > 0 && id < 1024) || (id > 0 && id < Globals.bsi.getEndingRange())) {
+                    if((isOnlyServer && id > 0 && id < 1024) || (id > Globals.bsi.getStartingRange() && id < Globals.bsi.getEndingRange())) {
                         //send key information to the nameserver
                         ps = new PrintStream(sock.getOutputStream());
 
