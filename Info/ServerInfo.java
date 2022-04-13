@@ -24,18 +24,18 @@ public class ServerInfo {
     //private NameServer succ = new NameServer(0, "127.0.0.1", Globals.port);
     private NameServer pred = null;
     private NameServer succ = null;
-    private boolean onlyServer = true;
 
     // see if the bootstrap is the only server
     public boolean isOnlyServer() {
-        return onlyServer;
+        return pred == null && succ == null;
     }
-
-    public void notOnlyServer() { onlyServer = false; }
-    public void resetOnlyServer() { onlyServer = true;}
 
     //get key space ranges
     public int getStartingRange() {
+        if(pred == null) {
+            return 1;
+        }
+
         return pred.id + 1;
     }
 
@@ -63,10 +63,18 @@ public class ServerInfo {
 
     //get id's
     public int getPredID() {
+        if(pred == null) {
+            return 0;
+        }
+
         return pred.id;
     }
 
     public int getSuccID() {
+        if(succ == null) {
+            return 0;
+        }
+
         return succ.id;
     }
 

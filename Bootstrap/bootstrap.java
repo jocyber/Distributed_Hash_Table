@@ -57,6 +57,16 @@ class Task implements Runnable {
 
                 if(msg.substring(0, 5).equals("enter")) {
                     int id = Integer.parseInt(msg.substring(6, msg.length()));
+                    //send key information to the nameserver
+
+                    if(id > 0 && id <= Globals.bsi.getEndingRange()) {
+                        
+                    }
+
+                    //reset keys in this space
+                    for(int i = 0; i < id; i++) {
+                        Globals.keySpace[i] = null;
+                    }
                 }
 
                 //set isOnly server to false
