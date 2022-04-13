@@ -32,10 +32,6 @@ public class ServerInfo {
 
     //get key space ranges
     public int getStartingRange() {
-        if(pred == null) {
-            return 1;
-        }
-
         return pred.id + 1;
     }
 
@@ -63,18 +59,10 @@ public class ServerInfo {
 
     //get id's
     public int getPredID() {
-        if(pred == null) {
-            return 0;
-        }
-
         return pred.id;
     }
 
     public int getSuccID() {
-        if(succ == null) {
-            return 0;
-        }
-
         return succ.id;
     }
 
@@ -82,12 +70,22 @@ public class ServerInfo {
 
     //reset the succ and pred
     public void setSucc(int id, String IP, int port) {
+        if(succ == null) {
+            succ = new NameServer(id, IP, port);
+            return;
+        }
+
         succ.id = id;
         succ.IP = IP;
         succ.port = port;
     }
 
     public void setPred(int id, String IP, int port) {
+        if(succ == null) {
+            succ = new NameServer(id, IP, port);
+            return;
+        }
+        
         pred.id = id;
         pred.IP = IP;
         pred.port = port;

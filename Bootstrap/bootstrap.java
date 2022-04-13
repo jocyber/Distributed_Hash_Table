@@ -83,9 +83,9 @@ class Task implements Runnable {
                 String msg = br.readLine();
 
                 /*
-                ----------------------------------
+                ---------------------------------
                 handle enter/exit of a nameserver
-                ----------------------------------
+                ---------------------------------
                 */ 
 
                 if(msg.substring(0, 5).equals("enter")) {//enter:id
