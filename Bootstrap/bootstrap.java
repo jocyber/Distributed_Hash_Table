@@ -79,38 +79,117 @@ class Task implements Runnable {
                 sock = ss.accept(); //wait for connection
                 br = new BufferedReader(new InputStreamReader(sock.getInputStream()));//used to read from socket
                 
-                //read the information from the socket
-                String msg = br.readLine();
+                //read the command from the socket
+                String command = br.readLine();
 
-                /*
-                ---------------------------------
-                handle enter/exit of a nameserver
-                ---------------------------------
-                */ 
+                // switch on command
+                switch(command) {
+                    case "updateSucc":
+                        int succId = Integer.parseInt(br.readLine());
+                        String succIP = br.readLine();
+                        int succPort = Integer.parseInt(br.readLine());
+                        Globals.bsi.setSucc(succId, succIP, succPort);
+                        break;
+                    case "enter":
+                        // get id and port of Name Server
+                        int nsID = Integer.parseInt(br.readLine()); // nameserver id
+                        int nsPort = Integer.parseInt(br.readLine());
+                        // add ip and port to string
+                        String nsIP = (((InetSocketAddress) sock.getRemoteSocketAddress()).getAddress()).toString().replace("/","");
 
-                if(msg.substring(0, 5).equals("enter")) {//enter:id
-                    int id = Integer.parseInt(msg.substring(6, msg.length()));
-                    boolean isOnlyServer = Globals.bsi.isOnlyServer();
+                        // if the only server
+                        if(Globals.bsi.isOnlyServer()) {
+                            // change predecessors and succesors
+                            Globals.bsi.setPred(nsID, nsIP, nsPort);
+                            Globals.bsi.setSucc(nsID, nsIP, nsPort);
 
-                    if((isOnlyServer && id > 0 && id < 1024) || (id >= Globals.bsi.getStartingRange() && id < Globals.bsi.getEndingRange())) {
-                        //send key information to the nameserver
-                        ps = new PrintStream(sock.getOutputStream());
+                            // update predecessor and succesor of new name space
+                            String updateNS = "updatePred&Succ\n" + Globals.id + "\n" + "bootstrap\n" + Globals.port + "\n" +
+                                Globals.id + "\n" + "bootstrap\n" + Globals.port + "\n";
+                            Socket nsSock = new Socket(nsIP, nsPort);
+                            PrintWriter out = new PrintWriter(nsSock.getOutputStream());
+                            out.write(updateNS);
+                            out.flush();
 
-                        for(int i = Globals.bsi.getStartingRange(); i < id; i++) {
-                            ps.println(i + ":" + Globals.keySpace[i]);
-                            Globals.keySpace[i] = null;
+                            // send over name space
+                            String keyspaceData = "";
+                            for(int i = 0; i < Globals.bsi.getStartingRange(); i++) {
+                                if(Globals.keySpace[i] != null) {
+                                    keyspaceData += i + " " + Globals.keySpace[i] + " ";
+                                    Globals.keySpace[i] = null;
+                                }
+                            }
+                            keyspaceData += "\n";
+                            out.write(keyspaceData);
+                            out.flush();
+
+                            // send over the conformation, append path taken
+                            String traversal = "0\n";
+                            out.print(traversal);
+                            out.flush();
+
+                            out.close();
+                            nsSock.close();
+                            Globals.bsi.setOnlyServer(false);
+                        } else {
+                            // if in range, else send to succesor
+                            if(nsID >= Globals.bsi.getStartingRange() && nsID <= 1023) {
+                                // change old predecessors succesor to new name server
+                                Socket nsSock = new Socket(Globals.bsi.getPredIP(), Globals.bsi.getPredPort());
+                                PrintWriter out = new PrintWriter(nsSock.getOutputStream());
+                                String updateSucc = "updateSucc\n" + nsID + "\n" + nsIP + "\n" + nsPort + "\n";
+                                out.write(updateSucc);
+                                out.flush();
+                                out.close();
+                                nsSock.close();
+
+                                // send Pred&Succ to new NameServer, namespace, and traversal
+                                // update predecessor and succesor of new name space
+                                String updateNS = "updatePred&Succ\n" + Globals.bsi.getPredID() + "\n" +
+                                    Globals.bsi.getPredIP() + "\n" + Globals.bsi.getPredPort() + "\n" +
+                                    Globals.id + "\n" + "bootstrap" + "\n" + 
+                                    Globals.port + "\n";
+                                nsSock = new Socket(nsIP, nsPort);
+                                out = new PrintWriter(nsSock.getOutputStream());
+                                out.write(updateNS);
+                                out.flush();
+
+                                // send namespace
+                                String keyspaceData = "";
+                                for(int i = Globals.bsi.getPredID()+1; i < nsID; i++) { // update
+                                    if(Globals.keySpace[i] != null) {
+                                        keyspaceData += i + " " + Globals.keySpace[i] + " ";
+                                        Globals.keySpace[i] = null;
+                                    }
+                                }
+                                keyspaceData += "\n";
+                                out.write(keyspaceData);
+                                out.flush();
+
+                                // send traversal
+                                String traversal = "0\n";
+                                out.print(traversal);
+                                out.flush();
+
+                                out.close();
+                                nsSock.close();
+
+                                // update bootstrap Predecessor to new nameserver
+                                Globals.bsi.setPred(nsID, nsIP, nsPort);
+
+                            } else {
+                                // send to succ, restructure command and append path taken
+                                Socket succSock = new Socket(Globals.bsi.getSuccIP(), Globals.bsi.getSuccPort());
+                                PrintWriter out = new PrintWriter(succSock.getOutputStream());
+                                String msg = command + "\n" + Integer.toString(nsID) + "\n" + Integer.toString(nsPort) + "\n" + "0";
+                                out.write(msg);
+                                out.flush();
+                                out.close();
+                                succSock.close();
+                            }
                         }
-
-                        ps.println("end");
-
-                        //update pred
-                        //update succ
-                    }
-                    else {
-                        Globals.sendToSucc(id);
-                    }
-                }
-
+                        break;
+                } // switch
                 sock.close();
             }
             catch(NullPointerException npe) {

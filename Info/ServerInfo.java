@@ -3,6 +3,7 @@ package Info;
 //information 'struct'
 public class ServerInfo {
     private int id = 0;
+    boolean isOnlyServer = true;
 
     //mx = current node
     //key space range = [H(pred(mx)) + 1, H(mx)]
@@ -20,14 +21,18 @@ public class ServerInfo {
     }
 
     //pred and succ start out as itself
-    //private NameServer pred = new NameServer(0, "127.0.0.1", Globals.port);
-    //private NameServer succ = new NameServer(0, "127.0.0.1", Globals.port);
-    private NameServer pred = null;
-    private NameServer succ = null;
+    private NameServer pred = new NameServer(0, "0", 0);
+    private NameServer succ = new NameServer(0, "0", 0);
+    //private NameServer pred = null;
+    //private NameServer succ = null;
 
     // see if the bootstrap is the only server
     public boolean isOnlyServer() {
-        return pred == null && succ == null;
+        return isOnlyServer;
+    }
+
+    public void setOnlyServer(boolean x) {
+        isOnlyServer = x;
     }
 
     //get key space ranges
@@ -93,6 +98,20 @@ public class ServerInfo {
         pred.id = id;
         pred.IP = IP;
         pred.port = port;
+    }
+
+    public void printPred() {
+        System.out.println("Predecessor: ");
+        System.out.println("ID: " + getPredID());
+        System.out.println("IP: " + getPredIP());
+        System.out.println("Port: " + getPredPort());
+    }
+
+    public void printSucc() {
+        System.out.println("Successor: ");
+        System.out.println("ID: " + getSuccID());
+        System.out.println("IP: " + getSuccIP());
+        System.out.println("Port: " + getSuccPort());
     }
 }
 

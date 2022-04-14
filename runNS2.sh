@@ -1,0 +1,1 @@
+java NameServer/nameserver ns2_config.txt
