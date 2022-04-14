@@ -32,6 +32,10 @@ public class ServerInfo {
 
     //get key space ranges
     public int getStartingRange() {
+        if(pred == null) {
+            return 1;
+        }
+
         return pred.id + 1;
     }
 
@@ -85,7 +89,7 @@ public class ServerInfo {
             succ = new NameServer(id, IP, port);
             return;
         }
-        
+
         pred.id = id;
         pred.IP = IP;
         pred.port = port;
