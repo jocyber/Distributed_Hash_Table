@@ -13,7 +13,6 @@ class Globals {
     // automatically sets pred and succ to itself
     public static ServerInfo bsi = new ServerInfo();
     public static int port;//for thread pool
-    public final static int port2 = 2003;//for user-interaction thread
     public static int id;
 
     public static String keySpace[] = new String[1024];//hash value is already given, so make an array instead and the id will be the position
@@ -27,39 +26,6 @@ class Globals {
             keySpace[i] = null;
         }
     }
-
-    public static boolean sendToSucc(int key) throws IOException {
-        // if key not found and there's another node in the system, send to successor
-       Socket succ_sock = new Socket(bsi.getSuccIP(), bsi.getSuccPort());
-       PrintStream ps = new PrintStream(succ_sock.getOutputStream());
-
-       //will send two packets. nameservers need to expect two so keeping track of node path and key is easier
-       ps.println(key + ":0/");
-
-       //create a server socket here and wait for oncoming connections from the name servers
-       ServerSocket ss = new ServerSocket(Globals.port2);
-       Socket ack_sock;
-
-       boolean flag = false;
-
-       ack_sock = ss.accept();
-       BufferedReader br = new BufferedReader(new InputStreamReader(ack_sock.getInputStream()));
-       String ack = br.readLine();
-
-       if(ack.equals("NF")) {
-           System.out.println("Key not found.");
-       }
-       else if(ack.substring(0, 2).equals("F:")) {// if found, F:path/to/key
-           System.out.println(key + ':' + ack.substring(2, ack.length()));//key:path/to/key
-           flag = true;
-       }
-
-       ack_sock.close();
-       succ_sock.close();
-       ss.close();
-
-       return flag;
-   }
 }
 
 class Task implements Runnable {
@@ -89,6 +55,10 @@ class Task implements Runnable {
                         String succIP = br.readLine();
                         int succPort = Integer.parseInt(br.readLine());
                         Globals.bsi.setSucc(succId, succIP, succPort);
+
+                        if(Globals.bsi.getPredID() == 0 && Globals.bsi.getSuccID() == 0) {
+                            Globals.bsi.setOnlyServer(true);
+                        }
                         break;
                     case "enter":
                         // get id and port of Name Server
@@ -188,6 +158,26 @@ class Task implements Runnable {
                                 succSock.close();
                             }
                         }
+                        break; // end of "enter"
+
+                    case "exit": // used when exiting a name server
+                        // update predecessor
+                        int id = Integer.parseInt(br.readLine());
+                        String ip = br.readLine();
+                        int port = Integer.parseInt(br.readLine());
+                        Globals.bsi.setPred(id, ip, port);
+
+                        // update keyspace
+                        String msg = br.readLine();
+                        String[] parse = msg.split("\\s+");
+                        int key;
+                        String data;
+                        for(int i = 0; i < parse.length; i +=2) {
+                            key = Integer.parseInt(parse[i]);
+                            data = parse[i+1];
+                            Globals.keySpace[key] = data;
+                        }
+
                         break;
                 } // switch
                 sock.close();
@@ -308,7 +298,7 @@ public class bootstrap {
                             }
                         } 
                         else {
-                            Globals.sendToSucc(key);
+                            //Globals.sendToSucc(key);
                         }
 
                         break;
@@ -320,7 +310,7 @@ public class bootstrap {
                             Globals.keySpace[key] = value;
                         } 
                         else {
-                            Globals.sendToSucc(key);
+                            //Globals.sendToSucc(key);
                         }
                         
                         break;
@@ -337,24 +327,22 @@ public class bootstrap {
                             }
                         } 
                         else {
-                            if(Globals.sendToSucc(key))
-                                System.out.println("Successful deletion.");
+                            // send to succ
                         }
                         
                         break;
 
                     case "print":
                         System.out.println("ID 0:");
+                        System.out.println("Range: " + Globals.bsi.getStartingRange() + " -> " + Globals.bsi.getEndingRange());
+                        Globals.bsi.printPred();
+                        Globals.bsi.printSucc();
 
                         for(int j = 0; j <= 1023; j++) {
                             if(Globals.keySpace[j] != null) {
                                 System.out.println("\t[" + j + "] " + Globals.keySpace[j]);
                             }
                         }
-
-                        if(!Globals.bsi.isOnlyServer()) {
-                            ;//send to successor to print the rest of the list
-                        } 
                         
                         break;
 

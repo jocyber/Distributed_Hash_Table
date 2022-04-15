@@ -1,0 +1,1 @@
+java NameServer/nameserver ns3_config.txt
