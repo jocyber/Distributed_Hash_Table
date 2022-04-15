@@ -107,7 +107,14 @@ public class nameserver {
                     sock.close();//must close for the connection to be accepted on next connection
                 }
                 else if(input.equals("exit")) {
-                    ;//fuckin party or whatever
+                    ;
+                    //Globals.id.remove();
+                    //key values to succ
+                    
+                    //print out "Successful exit"
+                    //ps.println("Successful exit");
+                    //print id of the successor
+                    //print range of key
                 }
             }
         }
