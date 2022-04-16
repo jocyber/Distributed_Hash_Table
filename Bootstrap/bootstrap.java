@@ -14,6 +14,7 @@ class Globals {
     public static ServerInfo bsi = new ServerInfo();
     public static int port;//for thread pool
     public static int id;
+    public static Object lock = new Object();
 
     public static String keySpace[] = new String[1024];//hash value is already given, so make an array instead and the id will be the position
     //doesn't need to be resized when new nodes are added since the range will be checked first.
@@ -24,6 +25,20 @@ class Globals {
         //keySpace[0] = 0;//position 0 is itself with an id of 0
         for(int i = 0; i < 1024; i++) {
             keySpace[i] = null;
+        }
+    }
+
+    public static void staticWait() {
+        synchronized (lock) {
+            try {
+                lock.wait();
+            } catch (Exception e) {}
+        }    
+    }
+
+    public static void staticNotify() {
+        synchronized (lock) {
+            lock.notify();
         }
     }
 }
@@ -178,6 +193,31 @@ class Task implements Runnable {
                             Globals.keySpace[key] = data;
                         }
 
+                        break; // end of exit
+                    case "lookup":
+                        // read result and print
+                        String index = br.readLine();
+                        if(index.equals("Key Not Found")) {
+                            System.out.println(index + ".\n");
+                        } else {
+                            String result = br.readLine();
+                            String path = br.readLine();
+                            System.out.println("Path taken: " + path);
+                            System.out.println("[" + index + "] " + result + "\n");
+                        }
+
+                        Globals.staticNotify();
+                        break; // end of lookup
+                    case "insert":
+                        String travPath = br.readLine();
+                        System.out.println("Succesful insert.");
+                        System.out.println("Path taken: " + travPath + "\n");
+                        Globals.staticNotify();
+                        break;
+                    case "delete":
+                        String path3 = br.readLine();
+                        System.out.println("Path taken: " + path3 + "\n");
+                        Globals.staticNotify();
                         break;
                 } // switch
                 sock.close();
@@ -291,14 +331,17 @@ public class bootstrap {
                         // if in keyspace print, if not send to succesor
                         if(inRange) {
                             if(Globals.keySpace[key] == null) {
-                                System.out.println("Key not found.");
+                                System.out.println("Key not found.\n");
                             } 
                             else {
-                                System.out.println(Globals.keySpace[key] + ":0/");
+                                System.out.println("[" + key + "] " + Globals.keySpace[key] + "\n");
                             }
                         } 
                         else {
-                            //Globals.sendToSucc(key);
+                            // send to succesor
+                            String msg = "lookup\n" + key + "\n" + "0";
+                            sendToSucc(msg);
+                            Globals.staticWait();
                         }
 
                         break;
@@ -306,11 +349,14 @@ public class bootstrap {
                     case "insert":
                         // if in keyspace, enter into table, if not send to succesor
                         if(inRange) {
-                            System.out.println(key + ":0/");
+                            System.out.println(key);
                             Globals.keySpace[key] = value;
                         } 
                         else {
-                            //Globals.sendToSucc(key);
+                            // send to successor
+                            String msg = "insert\n" + key + "\n" + value + "\n" + "0";
+                            sendToSucc(msg);
+                            Globals.staticWait();
                         }
                         
                         break;
@@ -318,16 +364,14 @@ public class bootstrap {
                     case "delete":
                         // if in keyspace, enter into table, if not, send to succesor
                         if(inRange) {
-                            if(Globals.keySpace[key] == null) {
-                                System.out.println("Key not found.");
-                            } 
-                            else {
-                                System.out.println(key + ":0/\nSuccessful deletion.");
-                                Globals.keySpace[key] = null;
-                            }
+                            System.out.println("Successful deletion.\n");
+                            Globals.keySpace[key] = null;
                         } 
                         else {
                             // send to succ
+                            String msg2 = "delete\n" + key + "\n0";
+                            sendToSucc(msg2);
+                            Globals.staticWait(); 
                         }
                         
                         break;
@@ -363,6 +407,19 @@ public class bootstrap {
         }
         catch(Exception ex) {
             System.err.println(ex);
+        }
+    } // main
+
+    public static void sendToSucc(String msg) {
+        try {
+            Socket sock = new Socket(Globals.bsi.getSuccIP(), Globals.bsi.getSuccPort());
+            PrintWriter out = new PrintWriter(sock.getOutputStream());
+            out.write(msg);
+            out.flush();
+            out.close();
+            sock.close();
+        } catch(Exception e) {
+            System.out.println("Failed to send to succ");
         }
     }
 }

@@ -88,7 +88,7 @@ class Task extends Thread {
                         String trav = br.readLine();
                         
                         // if in range handle, else send to succ
-                        if(nsID >= Globals.nsi.getStartingRange() && nsID < Globals.id) {
+                        if(nsID >= Globals.nsi.getStartingRange() && nsID <= Globals.id) {
                             // change old predecessors succesor to new name server
                             Socket nsSock = new Socket(Globals.nsi.getPredIP(), Globals.nsi.getPredPort());
                             PrintWriter out = new PrintWriter(nsSock.getOutputStream());
@@ -142,7 +142,7 @@ class Task extends Thread {
                             out.close();
                             succSock.close();
                         }
-                        break;
+                        break; // end of enter
                     case "exit": // used when exiting a name server
                         // update predecessor
                         int id = Integer.parseInt(br.readLine());
@@ -153,6 +153,59 @@ class Task extends Thread {
                         // update keyspace
                         updateKeyspace(br, sock);
 
+                        break; // end of exit
+                    case "lookup":
+                        int key = Integer.parseInt(br.readLine());
+                        String path = br.readLine();
+                        // if key is in range, send result to bootstrap, else send to succesor
+                        if(key >= Globals.nsi.getStartingRange() && key <= Globals.id) {
+                            // get the data
+                            String x = Globals.keySpace[key];
+                            if(x == null) {
+                                String msg = command + "\n" + "Key Not Found";
+                                sendToBootstrap(msg);
+                            } else {
+                                // send data to bootstrap and add traversal path
+                                String msg = command + "\n" + key + "\n" + x + "\n" + path + " -> " + Globals.id;
+                                sendToBootstrap(msg);
+                            }
+                        } else {
+                            // send to succesor
+                            String msg = command + "\n" + key + "\n" + path + " -> " + Globals.id;
+                            sendToSucc(msg);
+                        }
+                        break; // end of lookup
+                    case "insert":
+                        int index = Integer.parseInt(br.readLine());
+                        String data = br.readLine();
+                        String path2 = br.readLine();
+
+                         // if key is in range, send result to bootstrap, else send to succesor
+                         if(index >= Globals.nsi.getStartingRange() && index <= Globals.id) {
+                            Globals.keySpace[index] = data;
+                            String msg2 = "insert\n" + path2 + " -> " + Globals.id;
+                            sendToBootstrap(msg2);
+                         } else {
+                            // send to succesor
+                            String msg2 = "insert\n" + index + "\n" +  data + "\n" + path2 + " -> " + Globals.id;
+                            sendToSucc(msg2);
+                         }
+
+                        break;
+                    case "delete":
+                        int indexDelete = Integer.parseInt(br.readLine());
+                        String path3 = br.readLine();
+
+                        // if key is in range, send result to bootstrap, else send to succesor
+                        if(indexDelete >= Globals.nsi.getStartingRange() && indexDelete <= Globals.id) {
+                            Globals.keySpace[indexDelete] = null;
+                            String msg2 = "delete\n" + path3 + " -> " + Globals.id;
+                            sendToBootstrap(msg2);
+                        } else {
+                            // send to succesor
+                            String msg2 = "delete\n" + indexDelete + "\n" + path3 + " -> " + Globals.id;
+                            sendToSucc(msg2);
+                        }
                         break;
                 }
                 br.close();
@@ -164,6 +217,30 @@ class Task extends Thread {
             catch(Exception e) {
                 System.err.println(e);
             }
+        }
+    }
+    public void sendToSucc(String msg) {
+        try {
+            Socket sock = new Socket(Globals.nsi.getSuccIP(), Globals.nsi.getSuccPort());
+            PrintWriter pw = new PrintWriter(sock.getOutputStream());
+            pw.write(msg);
+            pw.flush();
+            pw.close();
+            sock.close(); 
+        } catch(Exception e) {
+            System.out.println("Failed to send to succesor");
+        }
+    }
+    public void sendToBootstrap(String msg) {
+        try {
+            Socket sock = new Socket(Globals.bootstrapIP, Globals.bootstrapPort);
+            PrintWriter pw = new PrintWriter(sock.getOutputStream());
+            pw.write(msg);
+            pw.flush();
+            pw.close();
+            sock.close();
+        } catch(Exception e) {
+            System.out.println("Failed to send to bootstrap");
         }
     }
     public void updatePredSucc(BufferedReader br, Socket sock) {
